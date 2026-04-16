@@ -43,8 +43,10 @@ fetchUser()
 
 },[])
 
-/* GET LOCATION */
+/* GET LOCATION (FIXED ✅) */
 const detectLocation = ()=>{
+
+return new Promise((resolve)=>{
 
 navigator.geolocation.getCurrentPosition(async(pos)=>{
 
@@ -57,13 +59,15 @@ const geo = await axios.get(
 `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
 )
 
-setLocation(geo.data.display_name)
+resolve(geo.data.display_name)
 
 }catch{
 
-setLocation("Unknown location")
+resolve("Unknown location")
 
 }
+
+})
 
 })
 
@@ -72,7 +76,8 @@ setLocation("Unknown location")
 /* START LIVE */
 const startLive = async()=>{
 
-detectLocation()
+const liveLocation = await detectLocation()   // ✅ WAIT for location
+setLocation(liveLocation)
 
 const mediaStream = await navigator.mediaDevices.getUserMedia({
 video:true,
@@ -88,7 +93,7 @@ socket.emit("start_live",{
 userId:user.userNo,
 name:user.name,
 phone:user.phone,
-location
+location: liveLocation   // ✅ correct location sent
 })
 
 socket.on("offer",async(data)=>{
