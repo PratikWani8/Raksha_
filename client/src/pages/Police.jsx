@@ -5,6 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-routing-machine";
 import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
+import GroqChatbot from "../components/GroqChatbot";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import policeImg from "../assets/police.png";
@@ -330,7 +331,7 @@ function Police() {
 
         <div id="map" className="w-full h-96 rounded-xl"></div>
       </section>
-
+      <GroqChatbot />
       <Footer />
     </motion.div>
   );
