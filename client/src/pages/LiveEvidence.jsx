@@ -153,7 +153,7 @@ socket.emit("stop_live")
 
 return(
 
-<div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-black flex items-center justify-center p-6">
+<div className="min-h-screen bg-linear-to-br from-indigo-900 via-purple-900 to-black flex items-center justify-center p-6">
 
 <motion.div
 initial={{opacity:0,scale:0.8}}
