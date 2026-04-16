@@ -1,0 +1,18 @@
+fastapi
+uvicorn[standard]
+pydantic
+
+# ML / NLP
+scikit-learn
+numpy
+pandas
+requests
+
+# Computer Vision 
+opencv-python-headless
+
+# YOLO
+ultralytics
+
+# Utility
+python-multipart
