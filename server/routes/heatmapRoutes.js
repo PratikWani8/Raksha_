@@ -1,7 +1,6 @@
 import express from "express"
 import SOS from "../models/SOS.js"
 import GuestSOS from "../models/GuestSOS.js"
-import RandomSOS from "../models/RandomSOS.js"
 import Complaint from "../models/Complaint.js"
 
 const router = express.Router()
@@ -30,7 +29,6 @@ try{
 
 const sosData = await SOS.find()
 const guestSOS = await GuestSOS.find()
-const randomSOS = await RandomSOS.find()
 const complaints = await Complaint.find()
 
 let points = []
@@ -62,17 +60,6 @@ weight:2
 })
 
 }
-
-})
-
-// RANDOM SOS
-randomSOS.forEach(r=>{
-
-points.push({
-lat:r.latitude,
-lng:r.longitude,
-weight:r.severity
-})
 
 })
 
