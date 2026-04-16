@@ -2,6 +2,7 @@ import heroImg from "../assets/r2.0_logo.png";
 import { motion } from "framer-motion";
 import ShinyText from "./ui/ShinyText"; 
 import { Sparkles } from "lucide-react";
+import GroqChatbot from "./GroqChatbot";
 
 function Hero() {
   return (
@@ -78,7 +79,10 @@ function Hero() {
         />
       </motion.div>
 
+      <GroqChatbot />
+
     </section>
+
   );
 }
 
