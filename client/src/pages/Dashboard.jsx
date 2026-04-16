@@ -11,6 +11,7 @@ import {
   Map,
   FilePlus,
   ShoppingCart,
+  BookOpen,
   LogOut
 } from "lucide-react"
 
@@ -33,7 +34,7 @@ export default function Dashboard() {
     { icon: MessageCircle, label: "Complaint", link: "/complaint" },
     { icon: FileText, label: "Status", link: "/status" },
     { icon: ShoppingCart, label: "Store", link: "/ecom" },
-    { icon: User, label: "Digital Twin", link: "/digital-twin" },
+    { icon: BookOpen, label: "Course", link: "/course" },
     { icon: LogOut, label: "Logout", logout: true }
   ]
 
@@ -54,7 +55,7 @@ export default function Dashboard() {
     </p>
 
     {/* CARDS */}
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5 sm:gap-6 md:gap-10 px-4 max-w-2xl mx-auto pb-20">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-5 sm:gap-6 md:gap-10 px-4 max-w-4xl mx-auto pb-20">
 
       {cards.map((card, index) => {
 
@@ -68,7 +69,7 @@ export default function Dashboard() {
               whileTap={{ scale: 0.96 }}
               transition={{ type: "spring", stiffness: 160, damping: 14 }}
               onClick={handleLogout}
-              className="col-span-2 sm:col-span-3 md:col-span-4 h-20 md:h-22 rounded-[2rem] flex flex-row justify-center items-center gap-4
+              className="col-span-2 sm:col-span-3 md:col-span-5 h-20 md:h-22 rounded-[2rem] flex flex-row justify-center items-center gap-4
               bg-red-500/70 border border-red-500 backdrop-blur-xl shadow-lg
               hover:shadow-red-500/60 transition-all duration-300 cursor-pointer"
             >
