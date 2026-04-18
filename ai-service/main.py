@@ -16,16 +16,20 @@ from ultralytics import YOLO
 
 app = FastAPI()
 
+# ENV
+BACKEND_URL = os.getenv("BACKEND_URL", "")
+CLIENT_URL = os.getenv("CLIENT_URL", "*")
+
 # CORS 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[CLIENT_URL] if CLIENT_URL != "*" else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# HEALTH CHECK
+# HEALTH 
 @app.get("/health")
 def health():
     return {"status": "AI service running"}
@@ -34,118 +38,98 @@ def health():
 model = RandomForestRegressor()
 
 def load_data():
+    try:
+        response = requests.get(f"{BACKEND_URL}/api/heatmap", timeout=5)
+        data = response.json()
 
-    response = requests.get("http://localhost:5000/api/heatmap")
+        rows = []
+        for item in data:
+            lat = item["lat"]
+            lng = item["lng"]
+            count = item["count"]
+            hour = datetime.now().hour
+            rows.append([lat, lng, hour, count])
 
-    data = response.json()
+        df = pd.DataFrame(rows, columns=["lat", "lng", "hour", "count"])
+        X = df[["lat", "lng", "hour"]]
+        y = df["count"]
 
-    rows = []
-
-    for item in data:
-
-        lat = item["lat"]
-        lng = item["lng"]
-        count = item["count"]
-
-        hour = datetime.now().hour
-
-        rows.append([lat,lng,hour,count])
-
-    df = pd.DataFrame(rows,columns=["lat","lng","hour","count"])
-
-    X = df[["lat","lng","hour"]]
-    y = df["count"]
-
-    return X,y
+        return X, y
+    except:
+        return None, None
 
 def train_model():
+    X, y = load_data()
+    if X is not None and len(X) > 0:
+        model.fit(X, y)
+        print("Model trained")
+    else:
+        print("No training data")
 
-    X,y = load_data()
+@app.on_event("startup")
+def startup_event():
+    train_model()
 
-    if len(X) > 0:
-        model.fit(X,y)
-
-train_model()
-
-# LOCATION SCHEMA FOR PREDICTION
+# LOCATION 
 class Location(BaseModel):
     lat: float
     lng: float
 
 @app.post("/predict")
-
 def predict(location: Location):
-
-    hour = datetime.now().hour
-
-    X = np.array([[location.lat,location.lng,hour]])
-
-    risk = model.predict(X)[0]
-
-    score = min(1,risk/10)
-
-    return {"risk": float(score)}
+    try:
+        hour = datetime.now().hour
+        X = np.array([[location.lat, location.lng, hour]])
+        risk = model.predict(X)[0]
+        score = min(1, risk / 10)
+        return {"risk": float(score)}
+    except:
+        return {"risk": 0.0}
 
 # FUTURE HOTSPOTS 
 @app.get("/future-hotspots")
-
 def future_hotspots():
+    try:
+        res = requests.get(f"{BACKEND_URL}/api/heatmap", timeout=5)
+        data = res.json()
 
-    res = requests.get("http://localhost:5000/api/heatmap")
+        grid = []
 
-    data = res.json()
+        for lat in np.linspace(18.3, 18.8, 20):
+            for lng in np.linspace(73.6, 74.1, 20):
+                hour = datetime.now().hour + 2
+                X = np.array([[lat, lng, hour]])
+                risk = model.predict(X)[0]
+                score = min(1, risk / 10)
 
-    grid = []
+                if score > 0.6:
+                    grid.append({
+                        "lat": float(lat),
+                        "lng": float(lng),
+                        "score": float(score)
+                    })
 
-    for lat in np.linspace(18.3,18.8,20):
-        for lng in np.linspace(73.6,74.1,20):
+        return grid
+    except:
+        return []
 
-            hour = datetime.now().hour + 2
-
-            X = np.array([[lat,lng,hour]])
-
-            risk = model.predict(X)[0]
-
-            score = min(1,risk/10)
-
-            if score > 0.6:
-
-                grid.append({
-                    "lat":float(lat),
-                    "lng":float(lng),
-                    "score":float(score)
-                })
-
-    return grid
-
-# FIR NLP
+# FIR NLP 
 texts = [
-    # Stalking
     "he was following me continuously",
     "someone is tracking me daily",
     "man keeps stalking me outside my house",
-
-    # Assault
     "he attacked me and punched me",
     "someone hit me badly",
     "physical attack happened",
-
-    # Harassment
     "he touched me inappropriately",
     "someone harassed me verbally",
     "man misbehaved with me",
-
-    # Theft
     "my phone got stolen",
     "someone took my wallet",
     "bike theft happened",
-
-    # Kidnapping
     "someone tried to kidnap me",
     "child kidnapping attempt",
     "forced into a car",
-
-    # Cybercrime
     "otp fraud happened",
     "phishing link stole my password",
     "money deducted due to scam",
@@ -164,7 +148,6 @@ labels = [
     "Cybercrime","Cybercrime","Cybercrime"
 ]
 
-# 🔥 Preprocessing function
 def clean_text(text):
     text = text.lower()
     text = re.sub(r'[^a-zA-Z\s]', '', text)
@@ -172,22 +155,15 @@ def clean_text(text):
 
 cleaned_texts = [clean_text(t) for t in texts]
 
-# 🔥 TF-IDF with n-grams
-vectorizer = TfidfVectorizer(
-    ngram_range=(1,2),  # captures phrases
-    stop_words='english'
-)
+vectorizer = TfidfVectorizer(ngram_range=(1,2), stop_words='english')
+X_nlp = vectorizer.fit_transform(cleaned_texts)
 
-X = vectorizer.fit_transform(cleaned_texts)
-
-# 🔥 Model
 nlp_model = MultinomialNB()
-nlp_model.fit(X, labels)
+nlp_model.fit(X_nlp, labels)
 
-# 🔥 API
 @app.post("/nlp")
 def classify(data: dict = Body(...)):
-    text = clean_text(data["text"])
+    text = clean_text(data.get("text", ""))
     vec = vectorizer.transform([text])
 
     probs = nlp_model.predict_proba(vec)[0]
@@ -203,9 +179,9 @@ def classify(data: dict = Body(...)):
     crime = nlp_model.predict(vec)[0]
 
     ipc_map = {
-        "Harassment": "IPC 354, IPC 509",
+        "Harassment": "IPC 354, 509",
         "Stalking": "IPC 354D",
-        "Assault": "IPC 351, IPC 352",
+        "Assault": "IPC 351, 352",
         "Theft": "IPC 379",
         "Kidnapping": "IPC 363",
         "Cybercrime": "IT Act 66, 66C, 66D"
@@ -217,108 +193,76 @@ def classify(data: dict = Body(...)):
         "confidence": float(confidence)
     }
 
-# AI SURVEILLANCE MODEL
-weapon_model = YOLO("best.pt")  
+# YOLO LAZY LOAD
+weapon_model = None
 
-weapons = [
-"knife",
-"gun",
-"pistol",
-"rifle",
-"scissors",
-"baseball bat",
-"hammer"
-]
+def get_weapon_model():
+    global weapon_model
+    if weapon_model is None:
+        try:
+            weapon_model = YOLO("yolov8m.pt")  
+            print("YOLO loaded")
+        except:
+            print("YOLO not found")
+    return weapon_model
+
+weapons = ["knife","gun","pistol","rifle","scissors","baseball bat","hammer"]
 
 if not os.path.exists("evidence"):
     os.makedirs("evidence")
 
 class Frame(BaseModel):
-    image:str
+    image: str
 
 # WEAPON DETECTION 
 @app.post("/detect")
 def detect_weapon(frame: Frame):
-
     try:
+        model = get_weapon_model()
+        if model is None:
+            return {"error": "Model not available"}
 
         img_data = frame.image.split(",")[1]
         img_bytes = base64.b64decode(img_data)
 
-        np_arr = np.frombuffer(img_bytes,np.uint8)
-        img = cv2.imdecode(np_arr,cv2.IMREAD_COLOR)
+        np_arr = np.frombuffer(img_bytes, np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        img = cv2.resize(img, (640, 640))
 
-        img = cv2.resize(img,(640,640))
-
-        results = weapon_model(img)
+        results = model(img)
 
         detections = []
 
         for r in results:
-
             for box in r.boxes:
-
                 cls = int(box.cls[0])
                 conf = float(box.conf[0])
-                label = weapon_model.names[cls]
+                label = model.names[cls]
 
                 if conf < 0.6:
                     continue
 
                 if label in weapons:
-
                     x1,y1,x2,y2 = map(int, box.xyxy[0])
 
                     detections.append({
-                        "label":label,
-                        "confidence":conf,
-                        "box":[x1,y1,x2,y2]
+                        "label": label,
+                        "confidence": conf,
+                        "box": [x1,y1,x2,y2]
                     })
 
-                    # draw red box on evidence image
-                    cv2.rectangle(
-                        img,
-                        (x1,y1),
-                        (x2,y2),
-                        (0,0,255),
-                        3
-                    )
+        # send alert (optional)
+        if len(detections) > 0 and BACKEND_URL:
+            try:
+                requests.post(f"{BACKEND_URL}/api/ai-alert", json={
+                    "type": "weapon",
+                    "detections": detections
+                }, timeout=3)
+            except:
+                pass
 
-                    cv2.putText(
-                        img,
-                        f"{label} {conf:.2f}",
-                        (x1,y1-10),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.8,
-                        (0,0,255),
-                        2
-                    )
-
-        # save evidence image if something detected
-        if len(detections) > 0:
-
-            filename = f"evidence/detect_{datetime.now().timestamp()}.jpg"
-            cv2.imwrite(filename,img)
-
-            for det in detections:
-
-                requests.post(
-                    "http://localhost:5000/api/ai-alert",
-                    json={
-                        "type":"weapon",
-                        "object":det["label"],
-                        "confidence":det["confidence"],
-                        "camera":"Camera 1",
-                        "evidence":filename
-                    }
-                )
-
-        return {
-            "detections":detections
-        }
+        return {"detections": detections}
 
     except Exception as e:
-
-        print("Detection Error:",e)
-
-        return {"error":"AI detection failed"}
+        print("Detection Error:", e)
+        return {"error": "AI detection failed"}
